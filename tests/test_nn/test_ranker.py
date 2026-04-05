@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -24,11 +25,11 @@ def _make_small_model(
     """Build a small DCN-v2 for testing."""
     vocab_sizes = {
         "page_type": 5,
-        "broker_id": 101,
+        "shop_id": 101,
     }
     embedding_dims = {
         "page_type": 3,
-        "broker_id": 16,
+        "shop_id": 16,
     }
     pretrained_emb_dim = PRETRAINED_EMB_DIM * 2 if with_emb else 0
 
@@ -51,26 +52,16 @@ def _make_small_model(
 
 
 class TestDCNv2Ranker:
-    def test_forward_no_emb(self):
-        model, vocab_sizes, _ = _make_small_model(with_emb=False)
+    @pytest.mark.parametrize("with_emb", [False, True], ids=["no_emb", "with_emb"])
+    def test_forward_output(self, with_emb):
+        model, vocab_sizes, _ = _make_small_model(with_emb=with_emb)
         model.eval()
         B, n_num = 4, 10
         bins = torch.randint(1, 8, (B, n_num), dtype=torch.long)
         cats = torch.randint(0, 3, (B, len(vocab_sizes)), dtype=torch.long)
+        emb = torch.randn(B, PRETRAINED_EMB_DIM * 2) if with_emb else None
         with torch.no_grad():
-            logits = model(bins, cats)
-        assert logits.shape == (B,)
-        assert torch.isfinite(logits).all()
-
-    def test_forward_with_emb(self):
-        model, vocab_sizes, _ = _make_small_model(with_emb=True)
-        model.eval()
-        B, n_num = 4, 10
-        bins = torch.randint(1, 8, (B, n_num), dtype=torch.long)
-        cats = torch.randint(0, 3, (B, len(vocab_sizes)), dtype=torch.long)
-        emb = torch.randn(B, PRETRAINED_EMB_DIM * 2)
-        with torch.no_grad():
-            logits = model(bins, cats, emb)
+            logits = model(bins, cats, emb) if with_emb else model(bins, cats)
         assert logits.shape == (B,)
         assert torch.isfinite(logits).all()
 
@@ -85,18 +76,6 @@ class TestDCNv2Ranker:
         assert logits.shape == (B,)
         assert torch.isfinite(logits).all()
 
-    def test_forward_with_embedding(self):
-        model, vocab_sizes, _ = _make_small_model(with_emb=True)
-        model.eval()
-        B, n_num = 4, 10
-        bins = torch.randint(1, 8, (B, n_num), dtype=torch.long)
-        cats = torch.randint(0, 3, (B, len(vocab_sizes)), dtype=torch.long)
-        emb = torch.randn(B, PRETRAINED_EMB_DIM * 2)
-        with torch.no_grad():
-            logit, hidden = model.forward_with_embedding(bins, cats, emb)
-        assert logit.shape == (B,)
-        assert hidden.shape == (B, 8)  # head_dims[-1]
-
     def test_projection_is_sequential(self):
         model, _, _ = _make_small_model(with_emb=True)
         assert isinstance(model.product_proj, nn.Sequential)
@@ -105,15 +84,15 @@ class TestDCNv2Ranker:
         assert isinstance(model.product_proj[1], nn.LayerNorm)
         assert isinstance(model.product_proj[2], nn.GELU)
 
-    def test_deep_net_uses_swiglu(self):
+    @pytest.mark.parametrize(
+        "attr",
+        ["deep_net", "head_hidden"],
+        ids=["deep_net", "head_hidden"],
+    )
+    def test_uses_swiglu_blocks(self, attr):
         model, _, _ = _make_small_model(with_emb=False)
-        has_swiglu = any(isinstance(m, SwiGLUBlock) for m in model.deep_net)
-        assert has_swiglu
-
-    def test_head_uses_swiglu(self):
-        model, _, _ = _make_small_model(with_emb=False)
-        has_swiglu = any(isinstance(m, SwiGLUBlock) for m in model.head_hidden)
-        assert has_swiglu
+        module = getattr(model, attr)
+        assert any(isinstance(m, SwiGLUBlock) for m in module)
 
     def test_head_logit_is_linear(self):
         model, _, _ = _make_small_model(with_emb=False)
@@ -144,24 +123,15 @@ class TestDCNv2Ranker:
         assert model.numeric_emb.num_embeddings == expected_num_embeddings
         assert model.numeric_emb.embedding_dim == emb_dim
 
-    def test_batch_size_one(self):
-        model, vocab_sizes, _ = _make_small_model(with_emb=False)
+    @pytest.mark.parametrize("with_emb", [False, True], ids=["no_emb", "with_emb"])
+    def test_batch_size_one(self, with_emb):
+        model, vocab_sizes, _ = _make_small_model(with_emb=with_emb)
         model.eval()
         bins = torch.randint(1, 8, (1, 10), dtype=torch.long)
         cats = torch.randint(0, 3, (1, len(vocab_sizes)), dtype=torch.long)
+        emb = torch.randn(1, PRETRAINED_EMB_DIM * 2) if with_emb else None
         with torch.no_grad():
-            logits = model(bins, cats)
-        assert logits.shape == (1,)
-        assert torch.isfinite(logits).all()
-
-    def test_batch_size_one_with_emb(self):
-        model, vocab_sizes, _ = _make_small_model(with_emb=True)
-        model.eval()
-        bins = torch.randint(1, 8, (1, 10), dtype=torch.long)
-        cats = torch.randint(0, 3, (1, len(vocab_sizes)), dtype=torch.long)
-        emb = torch.randn(1, PRETRAINED_EMB_DIM * 2)
-        with torch.no_grad():
-            logits = model(bins, cats, emb)
+            logits = model(bins, cats, emb) if with_emb else model(bins, cats)
         assert logits.shape == (1,)
         assert torch.isfinite(logits).all()
 
@@ -179,4 +149,4 @@ class TestParameterCount:
         param_names = [name for name, _ in model.named_parameters()]
         assert not any("product_id" in n for n in param_names)
         assert not any("unified_buyer_id" in n for n in param_names)
-        assert any("broker_id" in n for n in param_names)
+        assert any("shop_id" in n for n in param_names)

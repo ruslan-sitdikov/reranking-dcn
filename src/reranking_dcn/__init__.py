@@ -1,6 +1,14 @@
 """DCN-v2 model architecture and serving pipeline for product ranking."""
 
-from .config import Config, ModelArchConfig
+from .config import (
+    Config,
+    DataConfig,
+    InfraConfig,
+    MonitorConfig,
+    OptimizerConfig,
+    RuntimeConfig,
+    TrainingConfig,
+)
 from .features import (
     ALL_FEATURES,
     CAT_FEATURES,
@@ -20,13 +28,18 @@ __all__ = [
     "ALL_FEATURES",
     "CAT_FEATURES",
     "Config",
+    "TrainingConfig",
     "CrossNetwork",
     "DCNv2Ranker",
     "DCNv2Serving",
     "DCNv2ServingNoEmb",
     "GPUFeaturePreprocessor",
     "HASH_SEEDS",
-    "ModelArchConfig",
+    "DataConfig",
+    "InfraConfig",
+    "MonitorConfig",
+    "OptimizerConfig",
+    "RuntimeConfig",
     "MoECrossLayer",
     "NUMERIC_FEATURES",
     "PRETRAINED_EMB_DIM",

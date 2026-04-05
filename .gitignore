@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Test caches
+.pytest_cache/
+
+# ONNX profiling artifacts (large binaries — store in GCS, not git)
+onnx_profile_artifacts/
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,7 @@
+name: dcn-v2-train-volume
+type: k8s-pvc
+infra: kubernetes/nebius-mk8s-nb-k8s
+size: 500Gi
+config:
+  storage_class_name: csi-mounted-fs-path-sc
+  access_mode: ReadWriteMany

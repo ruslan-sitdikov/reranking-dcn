@@ -107,8 +107,9 @@ class DCNv2Ranker(nn.Module):
         self.head_logit = nn.Linear(head_dims[-1], 1)
         self._init_weights()
 
-    def _init_weights(self) -> None:
-        for child in self.deep_net:
+    @staticmethod
+    def _init_mlp(seq: nn.Sequential) -> None:
+        for child in seq:
             if isinstance(child, SwiGLUBlock):
                 nn.init.xavier_uniform_(child.w_gate.weight)
                 nn.init.xavier_uniform_(child.w_val.weight)
@@ -119,16 +120,9 @@ class DCNv2Ranker(nn.Module):
                 if child.bias is not None:
                     nn.init.zeros_(child.bias)
 
-        for child in self.head_hidden:
-            if isinstance(child, SwiGLUBlock):
-                nn.init.xavier_uniform_(child.w_gate.weight)
-                nn.init.xavier_uniform_(child.w_val.weight)
-                if child.w_val.bias is not None:
-                    nn.init.zeros_(child.w_val.bias)
-            elif isinstance(child, nn.Linear):
-                nn.init.xavier_uniform_(child.weight)
-                if child.bias is not None:
-                    nn.init.zeros_(child.bias)
+    def _init_weights(self) -> None:
+        self._init_mlp(self.deep_net)
+        self._init_mlp(self.head_hidden)
 
         nn.init.normal_(self.head_logit.weight, std=0.01)
         if self.head_logit.bias is not None:
@@ -230,23 +224,3 @@ class DCNv2Ranker(nn.Module):
         combined = self._compute_combined(numeric_bins, cat_indices, pretrained_emb)
         hidden = self.head_hidden(combined)
         return self.head_logit(hidden).squeeze(-1).clamp(self.LOGIT_CLAMP_MIN, self.LOGIT_CLAMP_MAX)
-
-    def forward_with_embedding(
-        self,
-        numeric_bins: torch.Tensor,
-        cat_indices: torch.Tensor,
-        pretrained_emb: torch.Tensor | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Returns (logit (B,), penultimate_hidden (B, head_dims[-1])).
-
-        Used for embedding extraction: head_hidden produces the penultimate
-        representation, head_logit produces the scalar logit.
-        """
-        combined = self._compute_combined(numeric_bins, cat_indices, pretrained_emb)
-        penultimate = self.head_hidden(combined)
-        logit = (
-            self.head_logit(penultimate)
-            .squeeze(-1)
-            .clamp(self.LOGIT_CLAMP_MIN, self.LOGIT_CLAMP_MAX)
-        )
-        return logit, penultimate

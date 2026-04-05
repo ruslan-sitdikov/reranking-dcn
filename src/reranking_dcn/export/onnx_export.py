@@ -64,7 +64,7 @@ def export_onnx(
         exported = {}
 
         dummy_bins = torch.randint(0, cfg.num_quantile_bins, (B, n_num), dtype=torch.long)
-        dummy_cats = torch.randint(0, 10, (B, n_cat), dtype=torch.long)
+        dummy_cats = torch.zeros(B, n_cat, dtype=torch.long)
 
         if raw_model._pretrained_emb_dim > 0:
             serving_emb = DCNv2Serving(raw_model)

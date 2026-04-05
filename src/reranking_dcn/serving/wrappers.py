@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 
 from ..nn.ranker import DCNv2Ranker
-from ..preprocessing.gpu_preprocessor import GPUFeaturePreprocessor
 
 
 class _DCNv2ServingBase(nn.Module):
@@ -23,6 +22,10 @@ class _DCNv2ServingBase(nn.Module):
         cat_order = trained_model._cat_feature_order
         self.cat_embeddings = nn.ModuleList([trained_model.embeddings[col] for col in cat_order])
         self.n_cat = len(cat_order)
+
+        for emb in self.cat_embeddings:
+            emb.max_norm = None
+        self.numeric_emb.max_norm = None
         self.cross_net = trained_model.cross_net
         self.deep_net = trained_model.deep_net
         self.head_hidden = trained_model.head_hidden
@@ -90,10 +93,6 @@ class DCNv2Serving(_DCNv2ServingBase):
             cat_indices,
             [proj_product_emb, proj_user_emb, has_product_emb, has_user_emb],
         )
-
-    @staticmethod
-    def n_cat_features(preprocessor: GPUFeaturePreprocessor) -> int:
-        return len(preprocessor.vocab_sizes)
 
 
 class DCNv2ServingNoEmb(_DCNv2ServingBase):

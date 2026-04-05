@@ -21,14 +21,14 @@ class TestArtifactSerialization:
         assert (tmp_path / "model_config.json").exists()
         assert (tmp_path / "feature_list.json").exists()
 
-    def test_id_hash_config_only_broker(self, tmp_path):
+    def test_id_hash_config_only_shop(self, tmp_path):
         cfg = Config(device="cpu")
         prep = make_dummy_preprocessor(cfg)
         serialize_preprocessing_artifacts(prep, cfg, tmp_path)
 
         with open(tmp_path / "id_hash_config.json") as f:
             id_hash = json.load(f)
-        assert list(id_hash.keys()) == ["broker_id"]
+        assert list(id_hash.keys()) == ["shop_id"]
 
     def test_feature_list_cat_features(self, tmp_path):
         cfg = Config(device="cpu")

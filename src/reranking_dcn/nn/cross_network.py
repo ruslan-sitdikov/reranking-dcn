@@ -36,10 +36,19 @@ class MoECrossLayer(nn.Module):
         nn.init.normal_(self.gate.weight, std=0.01)
 
     def forward(self, x0: torch.Tensor, xl: torch.Tensor) -> torch.Tensor:
-        gate_scores = torch.softmax(self.gate(xl), dim=-1)
-        vx = torch.einsum("krd,bd->bkr", self.V, xl)
-        uvx = torch.einsum("kdr,bkr->bkd", self.U, vx)
-        expert_out = torch.einsum("bk,bkd->bd", gate_scores, uvx)
+        gate_scores = torch.softmax(self.gate(xl), dim=-1)  # (B, K)
+
+        # V @ xl → single GEMM: (B, d) @ (d, K*r) → (B, K, r)
+        vx = xl.matmul(self.V.reshape(self.num_experts * self.low_rank, -1).t()).view(
+            -1, self.num_experts, self.low_rank
+        )
+
+        # U @ vx → batched MatMul: (K, B, r) @ (K, r, d) → (K, B, d) → (B, K, d)
+        uvx = torch.bmm(vx.permute(1, 0, 2), self.U.transpose(1, 2)).permute(1, 0, 2)
+
+        # Gated expert sum: (B, K, 1) * (B, K, d) → sum → (B, d)
+        expert_out = (gate_scores.unsqueeze(-1) * uvx).sum(dim=1)
+
         return x0 * (expert_out + self.bias) + xl
 
 

@@ -207,5 +207,5 @@ ALL_FEATURES = list(NUMERIC_FEATURES) + list(CAT_FEATURES)
 PRETRAINED_EMB_DIM = 768
 
 # Polars hash seeds — must be identical everywhere (training, serving, tests)
-# to guarantee train/serve parity for hashed ID columns (e.g. broker_id).
+# to guarantee train/serve parity for hashed ID columns (e.g. shop_id).
 HASH_SEEDS = {"seed": 42, "seed_1": 43, "seed_2": 44, "seed_3": 45}

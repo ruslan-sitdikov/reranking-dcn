@@ -36,12 +36,15 @@ def validate_parity(
     raw_model.cpu()
 
     n_num = len(NUMERIC_FEATURES)
-    n_cat = len(preprocessor.vocab_sizes)
+    cat_order = sorted(preprocessor.vocab_sizes.keys())
+    cat_vocab_sizes = [preprocessor.vocab_sizes[col] for col in cat_order]
     B = n_samples
     all_passed = True
 
     dummy_bins = torch.randint(1, cfg.num_quantile_bins, (B, n_num), dtype=torch.long)
-    dummy_cats = torch.randint(1, 5, (B, n_cat), dtype=torch.long)
+    dummy_cats = torch.stack(
+        [torch.randint(0, max(2, vs), (B,)) for vs in cat_vocab_sizes], dim=1
+    ).long()
 
     if "no_emb" in onnx_paths:
         log.info("  Validating parity: no_emb variant (%d samples)...", B)
