@@ -13,7 +13,7 @@ import torch
 from .config import Config
 from .export.benchmark import benchmark_latency
 from .export.checkpoint import (
-    PREPROCESSOR_CHECKPOINT_KEYS,
+    PREPROCESSOR_STATE_KEYS,
     build_model_from_config,
     load_checkpoint,
 )
@@ -99,7 +99,7 @@ def main() -> None:
 
     if args.preprocessor_path:
         state = torch.load(args.preprocessor_path, map_location="cpu", weights_only=False)
-        missing = PREPROCESSOR_CHECKPOINT_KEYS - set(state.keys())
+        missing = PREPROCESSOR_STATE_KEYS - set(state.keys())
         if missing:
             raise ValueError(
                 f"Preprocessor checkpoint is missing expected keys: {missing}. "

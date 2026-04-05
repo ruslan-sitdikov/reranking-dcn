@@ -1,0 +1,83 @@
+name: dcn-v2-training-dev
+
+resources:
+  cloud: kubernetes
+  accelerators: H200:1
+  cpus: 32
+  memory: 512
+  use_spot: false
+  labels:
+    kueue.x-k8s.io/queue-name: default-queue
+    showback_cost_owner_ref: app__shop-ml
+    showback_steward_ref: app__shop-ml
+    ml.shopify.io/quota-group: unified-recommenders
+  image_id: us-docker.pkg.dev/deeplearning-platform-release/gcr.io/base-cu124.py310:latest
+  autostop:
+    idle_minutes: 60
+    down: true
+
+volumes:
+  /mnt/data: dcn-v2-train-volume
+
+# Run from repo root: cd ~/src/github.com/Shopify/shop-ml-cursor && sky launch ...
+file_mounts:
+  /app/src: vertexai-training/reranking_dcn/src
+  /app/configs: vertexai-training/reranking_dcn/configs
+  /app/requirements.txt: vertexai-training/reranking_dcn/requirements/production.txt
+  /tmp/adc.json: ~/.config/gcloud/application_default_credentials.json
+
+setup: |
+  set -euo pipefail
+  mkdir -p /root/.config/gcloud
+  cp /tmp/adc.json /root/.config/gcloud/application_default_credentials.json
+  pip install uv
+  cd /app
+  uv venv /app/.venv --python 3.10 --clear
+  uv pip install --python /app/.venv/bin/python \
+    --index-url https://download.pytorch.org/whl/cu124 "torch==2.5.1" triton --no-cache
+  uv pip install --python /app/.venv/bin/python \
+    -r requirements.txt --no-cache
+  echo "Setup complete."
+
+run: |
+  set -euo pipefail
+
+  export PATH="/app/.venv/bin:$PATH"
+  export PYTHONPATH="/app/src:${PYTHONPATH:-}"
+
+  echo "=== DCN-v2 Training Dev Job ==="
+  echo "Working dir: $(pwd)"
+  echo "Mode: ${MODE:-base_train}"
+  echo "Stop date: ${STOP_DATE:-unset}"
+  echo "User sample: ${USER_SAMPLE_PCT:-5}%"
+  nvidia-smi
+  python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available -- check PyTorch/driver compat'; print(f'CUDA OK: {torch.cuda.get_device_name(0)}')"
+
+  cd /app
+  python -m reranking_dcn.train_cli \
+    --config configs/${CONFIG_FILE:-base_training.yaml} \
+    --mode ${MODE:-base_train} \
+    --stop_date ${STOP_DATE:-2026-03-24} \
+    --user_sample_pct ${USER_SAMPLE_PCT:-5} \
+    --billing_project ${BILLING_PROJECT:-sdp-stg-shop-ml} \
+    --gcs_bucket ${GCS_BUCKET:-sdp-stg-shop-ml-temp} \
+    --checkpoint_gcs_prefix "${CHECKPOINT_GCS_PREFIX:-}" \
+    --nn_base_train_start "${BASE_TRAIN_START:-}" \
+    --nn_base_train_stop "${BASE_TRAIN_STOP:-}" \
+    --update_latest_checkpoint ${UPDATE_LATEST_CHECKPOINT:-true} \
+    --local_dir /mnt/data/dcn_dev \
+    --output_dir /mnt/data/dcn_dev/outputs
+
+  echo "=== DCN-v2 Training Dev Job Complete ==="
+
+envs:
+  MODE: base_train
+  STOP_DATE: "2026-03-25"
+  USER_SAMPLE_PCT: "100"
+  CONFIG_FILE: base_training.yaml
+  BILLING_PROJECT: sdp-stg-shop-ml
+  GCS_BUCKET: sdp-stg-shop-ml-temp
+  CHECKPOINT_GCS_PREFIX: ""
+  BASE_TRAIN_START: ""
+  BASE_TRAIN_STOP: ""
+  UPDATE_LATEST_CHECKPOINT: "true"

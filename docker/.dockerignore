@@ -1,0 +1,12 @@
+.venv/
+tests/
+onnx_profile_artifacts/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+uv.lock
+*.pyc
+.git/
+.gitignore
+README.md
+profile_onnx_inference.py

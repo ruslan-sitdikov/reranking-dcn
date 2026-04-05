@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
-from ..config import Config, ModelArchConfig
+from ..config import Config
 from ..features import ALL_FEATURES, CAT_FEATURES, NUMERIC_FEATURES
 from ..preprocessing.gpu_preprocessor import GPUFeaturePreprocessor
 
@@ -48,23 +47,12 @@ def serialize_preprocessing_artifacts(
     with open(output_dir / "embedding_dims.json", "w") as f:
         json.dump(preprocessor.embedding_dims, f, indent=2)
 
-    arch_config = ModelArchConfig(
+    arch_dict = cfg.to_serving_arch_dict(
         num_continuous=preprocessor.num_continuous,
-        n_quantile_bins=cfg.num_quantile_bins,
-        num_emb_dim=cfg.num_emb_dim,
-        pretrained_emb_dim=cfg.pretrained_emb_dim if cfg.use_pretrained_embeddings else 0,
-        projected_emb_dim=cfg.projected_emb_dim,
-        num_cross_layers=cfg.dcn_num_cross_layers,
-        num_experts=cfg.dcn_num_experts,
-        expert_rank=cfg.dcn_expert_rank,
-        deep_dims=list(cfg.dcn_deep_dims),
-        head_dims=list(cfg.head_dims),
-        dropout=cfg.dropout,
-        num_cat_features=len(preprocessor.vocab_sizes),
-        cat_feature_order=sorted(preprocessor.vocab_sizes.keys()),
+        vocab_sizes=preprocessor.vocab_sizes,
     )
     with open(output_dir / "model_config.json", "w") as f:
-        json.dump(asdict(arch_config), f, indent=2)
+        json.dump(arch_dict, f, indent=2)
     log.info("  Saved model_config")
 
     feature_list = {

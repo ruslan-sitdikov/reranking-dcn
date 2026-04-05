@@ -1,0 +1,15 @@
+torch>=2.5
+triton>=3.0
+polars>=1.0
+google-cloud-bigquery>=3.20
+google-cloud-storage>=2.16
+google-cloud-secret-manager>=2.18
+gcsfs>=2024.2
+onnx>=1.16
+onnxruntime>=1.18
+onnxsim>=0.4
+numpy>=1.26
+scikit-learn>=1.4
+tqdm>=4.66
+pyyaml>=6.0
+comet-ml>=3.39

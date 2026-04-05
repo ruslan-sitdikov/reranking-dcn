@@ -13,7 +13,6 @@ import torch
 import torch.nn as nn
 
 from ..features import CAT_FEATURES, HASH_SEEDS, NUMERIC_FEATURES, PRETRAINED_EMB_DIM
-from .quantile import quantile_encode_np
 
 log = logging.getLogger(__name__)
 
@@ -95,23 +94,19 @@ class GPUFeaturePreprocessor(nn.Module):
         bins_t = torch.searchsorted(self._quantile_boundaries, vals_t)
         return (bins_t.T.contiguous() + 1).long()
 
-    def quantile_encode(self, numeric: np.ndarray) -> np.ndarray:
-        """(N, num_features) float32 -> (N, num_features) int64 bin indices (1-based)."""
-        return quantile_encode_np(numeric, self._quantile_boundaries.cpu().numpy())
-
     def transform(
         self,
         df: "pl.DataFrame",
         *,
         skip_targets: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, np.ndarray | None]:
-        """Extract numeric + encoded cats + pretrained embeddings + optional targets.
+        """Extract numeric + encoded cats + pretrained embeddings + optional target.
 
         Returns:
             numeric:        (N, num_features) float32 -- raw values (binning deferred to GPU).
             cat_indices:    (N, num_cat) int32 -- encoded categoricals + hashed IDs.
             pretrained_emb: (N, 2*768) float32 or None if columns absent.
-            targets_3:      (N, 3) float32 or None if skip_targets=True.
+            targets:        (N,) float32 (target_is_native_order) or None if skip_targets=True.
         """
         import polars as pl
 
@@ -158,14 +153,8 @@ class GPUFeaturePreprocessor(nn.Module):
         if skip_targets:
             return numeric, cat_indices, pretrained_emb, None
 
-        targets_3 = df.select(
-            [
-                pl.col("target_is_clicked").cast(pl.Float32),
-                pl.col("target_is_high_quality_click").cast(pl.Float32),
-                pl.col("target_is_native_order").cast(pl.Float32),
-            ]
-        ).to_numpy(allow_copy=True)
-        return numeric, cat_indices, pretrained_emb, targets_3
+        targets = df["target_is_native_order"].fill_null(0).cast(pl.Float32).to_numpy()
+        return numeric, cat_indices, pretrained_emb, targets
 
     @property
     def num_continuous(self) -> int:
@@ -174,3 +163,39 @@ class GPUFeaturePreprocessor(nn.Module):
     @property
     def n_quantile_bins(self) -> int:
         return self._n_quantile_bins
+
+    # -- Safe serialization (replaces pickle-based checkpoint) ---------------
+
+    def save_state(self) -> dict:
+        """Serialize preprocessor state as a plain dict (no pickle).
+
+        All values are tensors or basic Python types, safe for
+        ``torch.save`` / ``torch.load(weights_only=True)``.
+        """
+        return {
+            "quantile_boundaries": self._quantile_boundaries.cpu(),
+            "cat_encoders": self.cat_encoders,
+            "vocab_sizes": self.vocab_sizes,
+            "embedding_dims": self.embedding_dims,
+            "id_hash_config": {k: list(v) for k, v in self._id_hash_config.items()},
+            "cat_emb_dim_overrides": dict(self._cat_emb_dim_overrides),
+            "n_quantile_bins": self._n_quantile_bins,
+        }
+
+    @classmethod
+    def from_state(cls, state: dict) -> GPUFeaturePreprocessor:
+        """Reconstruct from a state dict produced by ``save_state()``.
+
+        Avoids pickling the entire nn.Module, enabling ``weights_only=True``
+        on checkpoint load and version-independent deserialization.
+        """
+        preprocessor = cls(
+            id_hash_config={k: tuple(v) for k, v in state["id_hash_config"].items()},
+            cat_emb_dim_overrides=state.get("cat_emb_dim_overrides", {}),
+            n_quantile_bins=state["n_quantile_bins"],
+        )
+        preprocessor.register_buffer("_quantile_boundaries", state["quantile_boundaries"])
+        preprocessor.cat_encoders = state["cat_encoders"]
+        preprocessor.vocab_sizes = state["vocab_sizes"]
+        preprocessor.embedding_dims = state["embedding_dims"]
+        return preprocessor

@@ -1,0 +1,39 @@
+name: dcn-v2-training
+
+resources:
+  cloud: kubernetes
+  accelerators: H200:1
+  cpus: 32
+  memory: 256
+  use_spot: false
+  labels:
+    kueue.x-k8s.io/queue-name: default-queue
+    showback_cost_owner_ref: app__shop-ml
+    showback_steward_ref: app__shop-ml
+    ml.shopify.io/quota-group: unified-recommenders
+  image_id: ${IMAGE_URI}
+  autostop:
+    idle_minutes: 30
+    down: true
+
+volumes:
+  /mnt/data: dcn-v2-train-volume
+
+run: |
+  set -euo pipefail
+
+  echo "=== DCN-v2 Training Job Start ==="
+  echo "Working dir: $(pwd)"
+  echo "Mode: ${MODE:-finetune}"
+  echo "Stop date: ${STOP_DATE:-unset}"
+
+  cd /app
+  python -m reranking_dcn.train_cli --config-str="${CONFIG_STR}"
+
+  echo "=== DCN-v2 Training Job Complete ==="
+
+envs:
+  CONFIG_STR: ""
+  MODE: finetune
+  STOP_DATE: ""
+  IMAGE_URI: ""

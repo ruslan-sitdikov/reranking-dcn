@@ -14,19 +14,6 @@ from reranking_dcn import (
 
 
 class TestGPUFeaturePreprocessor:
-    def test_quantile_encode_cpu(self):
-        prep = GPUFeaturePreprocessor(n_quantile_bins=4)
-        boundaries = np.array([[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]], dtype=np.float32)
-        prep.register_buffer("_quantile_boundaries", torch.from_numpy(boundaries))
-
-        data = np.array([[0.5, 5.0], [1.5, 15.0], [2.5, 25.0], [3.5, 35.0]], dtype=np.float32)
-        bins = prep.quantile_encode(data)
-
-        assert bins.shape == (4, 2)
-        assert bins.dtype == np.int64
-        assert bins[0, 0] == 1  # 0.5 < 1.0 → bin 0 + 1
-        assert bins[3, 1] == 4  # 35.0 > 30.0 → bin 3 + 1
-
     def test_quantile_encode_on_device(self):
         prep = GPUFeaturePreprocessor(n_quantile_bins=4)
         boundaries = torch.tensor([[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]])
@@ -56,7 +43,7 @@ class TestGPUFeaturePreprocessor:
             id_hash_config=cfg.id_hash_config,
             cat_emb_dim_overrides=cfg.cat_emb_dim_overrides,
         )
-        assert "broker_id" in prep._id_hash_config
+        assert "shop_id" in prep._id_hash_config
         assert "product_id" not in prep._id_hash_config
 
     def test_transform_handles_nan_null(self):

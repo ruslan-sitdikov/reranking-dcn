@@ -1,0 +1,28 @@
+# One-time full training from scratch on 8 weeks of data.
+# Usage: python -m reranking_dcn.train_cli --config configs/base_training.yaml
+
+mode: base_train
+
+billing_project: sdp-prd-shop-ml
+stop_date: "2026-03-08"
+local_dir: /mnt/data/dcn_base
+output_dir: /mnt/data/dcn_base/outputs
+
+gcs_bucket: sdp-prd-shop-ml-temp
+output_gcs_prefix: dcn_v2
+
+nn_base_train_start: "2026-01-10"
+nn_base_train_stop: "2026-02-10"
+epochs: 1
+
+learning_rate: 1.0e-3
+weight_decay: 1.0e-3
+use_cosine_lr: true
+cosine_warmup_fraction: 0.05
+
+batch_size: 2048
+num_workers: 16
+user_sample_pct: 100
+
+training_surface: all
+comet_project: dcn-v2-training

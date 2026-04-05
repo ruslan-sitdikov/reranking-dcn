@@ -1,0 +1,33 @@
+# Daily fine-tuning on 1 day of fresh data.
+# Loads the latest checkpoint from GCS, trains 1 epoch with layer-wise LRs.
+# Usage: triggered by Airflow DAG daily (or manually via train_cli).
+
+mode: finetune
+
+billing_project: sdp-prd-shop-ml
+local_dir: /mnt/data/dcn_finetune
+output_dir: /mnt/data/dcn_finetune/outputs
+
+gcs_bucket: sdp-prd-shop-ml-temp
+output_gcs_prefix: dcn_v2
+checkpoint_gcs_prefix: gs://sdp-prd-shop-ml-temp/dcn_v2/latest
+
+finetune_data_window_days: 1
+epochs: 1
+
+finetune_lrs:
+  embeddings: 1.0e-5
+  numeric_emb: 1.0e-5
+  cross_net: 5.0e-5
+  product_proj: 1.0e-4
+  user_proj: 1.0e-4
+  deep_net: 1.0e-4
+  head: 5.0e-4
+  default: 1.0e-4
+
+batch_size: 2048
+num_workers: 16
+user_sample_pct: 100
+
+training_surface: all
+comet_project: dcn-v2-training
