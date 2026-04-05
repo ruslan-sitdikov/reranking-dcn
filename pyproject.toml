@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reranking-dcn"
+version = "0.1.0"
+description = "DCN-v2 product ranker: training, ONNX export, and CPU serving"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.0",
+    "numpy",
+    "polars>=1.0",
+]
+
+[project.optional-dependencies]
+export = ["onnxruntime", "onnx", "onnxsim"]
+
+[project.scripts]
+dcn-export = "reranking_dcn.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "onnx>=1.20.1",
+    "onnxruntime>=1.24.4",
+    "onnxscript>=0.6.2",
+    "onnxsim>=0.6.2",
+    "pytest>=9.0.2",
+]
